@@ -1,7 +1,6 @@
 // Hack CPU Assembler
 
 import fs from "node:fs";
-import { argv, exit, exitCode } from "node:process";
 
 if (!argv[1]) {
   throw new Error("No asm file given");
@@ -67,8 +66,8 @@ const computationTable = {
   "D-1": "001110",
   "A-1": "110010",
   "M-1": "110010",
-  "D+A": "000001",
-  "D+M": "000001",
+  "D+A": "000010",
+  "D+M": "000010",
   "D-A": "010001",
   "D-M": "010011",
   "A-D": "000111",
@@ -106,10 +105,13 @@ let parseAsm = (instructions) => {
     }
   });
 
+  let finalResult = ""
   for (let i = 0; i < ir.length; i++) {
     const inx = ir[i];
     console.log(inx.value);
+    finalResult += inx.value+"\n"
   }
+  fs.writeFileSync("result.txt", finalResult);
 };
 
 let parseCInx = (instruction) => {
