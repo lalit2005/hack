@@ -11,7 +11,7 @@ const fileContents = fs.readFileSync(filePath);
 const instructions = fileContents
   .toString()
   .split("\n")
-  .map((a) => a)
+  .map((a) => a.trim())
   .filter((a) => {
     return !a.startsWith("//") && a; // '& a' ensures that "" are not considered as valid instructions
   });
@@ -34,6 +34,13 @@ let symbolTable = {
   R13: 13,
   R14: 14,
   R15: 15,
+  SP: 0,
+  LCL: 1,
+  ARG: 2,
+  THIS: 3,
+  THAT: 4,
+  SCREEN: 16384,
+  KBD: 24576,
 };
 
 const destinationTable = {
@@ -91,19 +98,22 @@ const jmpTable = {
 
 let parseAsm = (instructions) => {
   let ir = [];
-  instructions.forEach((instruction, i) => {
-    if (instruction.startsWith("@")) {
-      ir[i] = {
-        instructionType: "A",
-        value: "0" + decimalToBinary(instruction.substring(1).trim()),
-      };
-    } else {
-      ir[i] = {
-        instructionType: "C",
-        value: parseCInx(instruction.trim()),
-      };
-    }
-  });
+  registerSymbols(instructions);
+  instructions
+    .filter((a) => !a.startsWith("("))
+    .forEach((instruction, i) => {
+      if (instruction.startsWith("@")) {
+        ir[i] = {
+          instructionType: "A",
+          value: parseAInx(instruction.trim()),
+        };
+      } else {
+        ir[i] = {
+          instructionType: "C",
+          value: parseCInx(instruction.trim()),
+        };
+      }
+    });
 
   let finalResult = "";
   for (let i = 0; i < ir.length; i++) {
@@ -112,6 +122,13 @@ let parseAsm = (instructions) => {
     finalResult += inx.value + "\n";
   }
   fs.writeFileSync("result.txt", finalResult);
+};
+
+let parseAInx = (instruction) => {
+  if (Number.isInteger(+instruction.substring(1))) {
+    return "0" + decimalToBinary(instruction.substring(1));
+  }
+  return "0" + decimalToBinary(symbolTable[instruction.substring(1)]);
 };
 
 let parseCInx = (instruction) => {
@@ -127,8 +144,6 @@ let parseCInx = (instruction) => {
   if (instruction.includes(";")) {
     jmpCode = jmpTable[instruction.split(";")[1]];
     if (!instruction.includes("=")) {
-      console.log("NO = and ONLY =");
-      console.log(instruction.split(";")[0]);
       computationCode = instruction.split(";")[0];
     }
     destCode = destinationTable[destCode || null];
@@ -137,13 +152,41 @@ let parseCInx = (instruction) => {
     a = "1";
   }
   computationCode = computationTable[String(computationCode)];
-  console.log({
-    instruction,
-    computationCode,
-    destCode,
-    jmpCode,
-  });
+  //console.log({
+  //  instruction,
+  //  computationCode,
+  //  destCode,
+  //  jmpCode,
+  //});
   return init + a + computationCode + destCode + jmpCode;
+};
+
+let registerSymbols = (instructions) => {
+  let labels = [];
+  instructions.forEach((inx, index) => {
+    if (inx.startsWith("(") && inx.endsWith(")")) {
+      let label = inx.substring(1, inx.length - 1);
+      symbolTable[label] = index - labels.length;
+      labels.push(label);
+    }
+  });
+  // If the instruction starts with @, it means it's an A instruction.
+  // The above block adds all the labels to symbolTable
+  // The below block adds variables to the symbolTable
+  let lastUsedRegisterAddress = 15;
+  instructions.forEach((inx) => {
+    if (
+      inx.startsWith("@") &&
+      !Number.isInteger(+inx.substring(1)) &&
+      !Object.keys(symbolTable).includes(inx.substring(1))
+    ) {
+      symbolTable[inx.substring(1)] = lastUsedRegisterAddress + 1;
+      lastUsedRegisterAddress += 1;
+    }
+  });
+  //console.log({
+  //  symbolTable,
+  //});
 };
 
 let decimalToBinary = (number) => {
