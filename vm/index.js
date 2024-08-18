@@ -1,5 +1,6 @@
 // Hack VM translator
 // written by Lalit (@lalit2005)
+// usage: bun index.js tests/SimpleAdd/SimpleAdd.vm
 
 import fs from "node:fs";
 import { argv } from "node:process";
@@ -30,20 +31,33 @@ const memorySegments = [
 ];
 
 function translate(vmInstructions) {
+  let finalAsmCode = [];
+  let instruction;
   vmInstructions.forEach((inx) => {
     if (inx.startsWith("push")) {
-      console.log(parsePush(inx));
+      instruction = parsePush(inx);
+      console.log(instruction);
+      finalAsmCode.push(parsePush(inx));
     } else if (inx.startsWith("pop")) {
-      console.log(parsePop(inx));
+      instruction = parsePop(inx);
+      console.log(instruction);
+      finalAsmCode.push(instruction);
     } else if (
       ["add", "sub", "neg", "eq", "gt", "lt", "and", "or", "not"].includes(inx)
     ) {
-      console.log(parseArithmetic());
+      instruction = parseArithmetic(inx);
+      console.log(instruction);
+      finalAsmCode.push(instruction);
     }
   });
+
+  fs.writeFileSync(
+    "result.asm",
+    `// Assembly code for ${filePath}\n\n` + finalAsmCode.join("\n"),
+  );
 }
 
-function parsePush(inx) {
+function parsePop(inx) {
   let segments = inx.split(" ");
   let [_, segment, value] = segments;
   if (segments.length != 3) {
@@ -54,37 +68,35 @@ function parsePush(inx) {
   }
   let asmCode;
   switch (segment) {
-    // example: push temp 6
+    // example: pop temp 6
     case "temp":
       asmCode = `
-@LCL
+@SP
+A=M-1
 D=M
-@5
-D=D+A
-@R13
+@${5 + +value}
 M=D
 @SP
 M=M-1
-D=M
-@R13
-A=M
-M=D
 `;
       break;
-    // example: push pointer 0/1
+    // example: pop pointer 0/1
     case "pointer":
       asmCode = `
 @SP
-A=M
+A=M-1
 D=M
-@${value == 0 ? 3 : 4}
+@${+value == 0 ? "THIS" : "THAT"}
 M=D
 @SP
 M=M-1
 `;
       break;
 
-    case ("local", "argument", "this", "that"):
+    case "local":
+    case "argument":
+    case "this":
+    case "that":
       let labels = {
         argument: "ARG",
         local: "LCL",
@@ -93,34 +105,41 @@ M=M-1
       };
       asmCode = `
 @SP
-A=M
+A=M-1
 D=M
-@${labels[value]}
+@R13
+M=D
+@${labels[segment]}
 D=M
 @${value}
 D=D+A
-A=D
+@R14
+M=D
+@R13
 D=M
-@SP
+@R14
 A=M
 M=D
 @SP
-M=M+1
+M=M-1
 `;
-    // example: push static 5
+      break;
+    // example: pop static 5
     // assuming that the file name is in the form hello.vm
     case "static":
+      let file = filePath.split("/")[filePath.split("/").length - 1];
       asmCode = `
-@${file[0].toUpperCase() + file.slice(1)}.${value}
-D=M
 @SP
-A=M
+A=M-1
+D=M
+@${file[0].toUpperCase() + file.slice(1)}.${value}
 M=D
 @SP
-M=M+1
+M=M-1
 `;
       break;
     default:
+      asmCode = "---------INVALID POP-----------";
       break;
   }
   return `// ${inx}
@@ -167,7 +186,7 @@ M=M+1
     // example: push pointer 0/1
     case "pointer":
       asmCode = `
-@${value == 0 ? 3 : 4}
+@${+value == 0 ? "THIS" : "THAT"}
 D=M
 @SP
 A=M
@@ -177,7 +196,10 @@ M=M+1
 `;
       break;
 
-    case ("local", "argument", "this", "that"):
+    case "local":
+    case "argument":
+    case "this":
+    case "that":
       let labels = {
         argument: "ARG",
         local: "LCL",
@@ -185,7 +207,7 @@ M=M+1
         that: "THAT",
       };
       asmCode = `
-@${labels[value]}
+@${labels[segment]}
 D=M
 @${value}
 D=D+A
@@ -197,9 +219,11 @@ M=D
 @SP
 M=M+1
 `;
+      break;
     // example: push static 5
     // assuming that the file name is in the form hello.vm
     case "static":
+      let file = filePath.split("/")[filePath.split("/").length - 1];
       asmCode = `
 @${file[0].toUpperCase() + file.slice(1)}.${value}
 D=M
@@ -211,8 +235,10 @@ M=M+1
 `;
       break;
     default:
+      asmCode = "---------INVALID PUSH -----------";
       break;
   }
+  console.log(asmCode);
   return `// ${inx}
 ${asmCode.trim()}
 `.trim();
@@ -220,6 +246,7 @@ ${asmCode.trim()}
 
 function parseArithmetic(inx) {
   let asmCode;
+  let id = randomInt();
   switch (inx) {
     case "add":
       asmCode = `
@@ -229,9 +256,8 @@ D=M
 A=A-1
 D=D+M
 M=D
-D=A
 @SP
-M=D
+M=M-1
 `;
       break;
     case "sub":
@@ -242,9 +268,8 @@ D=M
 A=A-1
 D=M-D
 M=D
-D=A
 @SP
-M=D
+M=M-1
 `;
       break;
     case "neg":
@@ -262,20 +287,25 @@ D=M
 A=A-1
 D=M-D
 
-@EQ_TRUE
+@EQ_TRUE_${id}
 D;JEQ
 
 @SP
 A=M-1
+A=A-1
 M=0
-@EQ_END
+@EQ_END_${id}
+0;JMP
 
-(EQ_TRUE)
+(EQ_TRUE_${id})
 @SP
 A=M-1
+A=A-1
 M=-1
 
-(EQ_END)
+(EQ_END_${id})
+@SP
+M=M-1
 `;
       break;
     case "gt":
@@ -286,20 +316,25 @@ D=M
 A=A-1
 D=M-D
 
-@GT_TRUE
+@GT_TRUE_${id}
 D;JGT
 
 @SP
 A=M-1
+A=A-1
 M=0
-@GT_END
+@GT_END_${id}
+0;JMP
 
-(GT_TRUE)
+(GT_TRUE_${id})
 @SP
 A=M-1
+A=A-1
 M=-1
 
-(GT_END)
+(GT_END_${id})
+@SP
+M=M-1
 `;
       break;
     case "lt":
@@ -310,20 +345,25 @@ D=M
 A=A-1
 D=M-D
 
-@LT_TRUE
+@LT_TRUE_${id}
 D;JLT
 
 @SP
 A=M-1
+A=A-1
 M=0
-@LT_END
+@LT_END_${id}
+0;JMP
 
-(LT_TRUE)
+(LT_TRUE_${id})
 @SP
 A=M-1
+A=A-1
 M=-1
 
-(LT_END)
+(LT_END_${id})
+@SP
+M=M-1
 `;
       break;
     case "and":
@@ -334,9 +374,8 @@ D=M
 A=A-1
 D=D&M
 M=D
-D=A
 @SP
-M=D+1
+M=M-1
 `;
       break;
     case "or":
@@ -347,9 +386,8 @@ D=M
 A=A-1
 D=D|M
 M=D
-D=A
 @SP
-M=D+1
+M=M-1
 `;
       break;
     case "not":
@@ -362,6 +400,14 @@ M=!M
     default:
       break;
   }
+
+  return `// ${inx}
+${asmCode.trim()}
+`.trim();
+}
+
+function randomInt() {
+  return Math.floor(Math.random() * 10e5);
 }
 
 translate(vmInstructions);

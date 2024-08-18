@@ -1,4 +1,8 @@
 .DS_STORE
+result.asm
+result.txt
 assembler/result.txt
 assembler/assembler.out
+vm/result.asm
+vm/assembler.out
 
