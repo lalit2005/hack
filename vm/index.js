@@ -14,7 +14,12 @@ const fileContents = fs.readFileSync(filePath);
 const vmInstructions = fileContents
   .toString()
   .split("\n")
-  .map((a) => a.trim())
+  .map((a) => {
+    if (!a.startsWith("//") && a.includes("//")) {
+      return a.substring(0, a.indexOf("//") - 1).trim();
+    }
+    return a.trim();
+  })
   .filter((a) => {
     return !a.startsWith("//") && a; // '& a' ensures that "" are not considered as valid instructions
   });
@@ -48,6 +53,21 @@ function translate(vmInstructions) {
       instruction = parseArithmetic(inx);
       console.log(instruction);
       finalAsmCode.push(instruction);
+    } else if (inx.startsWith("label")) {
+      instruction = parseLabel(inx);
+      console.log(instruction);
+      finalAsmCode.push(instruction);
+      parseLabel(inx);
+    } else if (inx.startsWith("goto")) {
+      instruction = parseGoto(inx);
+      console.log(instruction);
+      finalAsmCode.push(instruction);
+    } else if (inx.startsWith("if-goto")) {
+      instruction = parseIfGoto(inx);
+      console.log(instruction);
+      finalAsmCode.push(instruction);
+    } else if (inx.startsWith("function")) {
+    } else if (inx.startsWith("call")) {
     }
   });
 
@@ -57,14 +77,59 @@ function translate(vmInstructions) {
   );
 }
 
+function parseIfGoto(inx) {
+  if (inx.split(" ").length != 2) {
+    throw new Error("Invalid if-goto statement" + " " + inx);
+  }
+  let [_, labelName] = inx.split(" ");
+  let asmCode = `
+// ${inx}
+@SP
+M=M-1
+A=M
+D=M
+@${labelName}
+D;JGT
+`;
+  return asmCode;
+}
+
+function parseGoto(inx) {
+  if (inx.split(" ").length != 2) {
+    throw new Error("Invalid goto statement" + " " + inx);
+  }
+  let [_, labelName] = inx.split(" ");
+  let asmCode = `
+// ${inx}
+@${labelName}
+0;JMP
+`;
+  return asmCode;
+}
+
+function parseLabel(inx) {
+  if (inx.split(" ").length != 2) {
+    throw new Error("Invalid label command" + " " + inx);
+  }
+
+  let [_, labelName] = inx.split(" ");
+
+  let asmCode = `
+// ${inx}
+(${labelName})
+`;
+  return asmCode.trim();
+}
+
 function parsePop(inx) {
   let segments = inx.split(" ");
   let [_, segment, value] = segments;
   if (segments.length != 3) {
-    throw new Error("Invalid pop statement");
+    console.log(segments);
+    throw new Error("Invalid pop statement" + " " + inx);
   }
   if (!memorySegments.includes(segment)) {
-    throw new Error("Invalid memory segment");
+    throw new Error("Invalid memory segment" + " " + inx);
   }
   let asmCode;
   switch (segment) {
@@ -152,10 +217,10 @@ function parsePush(inx) {
   let segments = inx.split(" ");
   let [_, segment, value] = segments;
   if (segments.length != 3) {
-    throw new Error("Invalid push statement");
+    throw new Error("Invalid push statement" + " " + inx);
   }
   if (!memorySegments.includes(segment)) {
-    throw new Error("Invalid memory segment");
+    throw new Error("Invalid memory segment" + " " + inx);
   }
   let asmCode;
   switch (segment) {
@@ -411,3 +476,4 @@ function randomInt() {
 }
 
 translate(vmInstructions);
+console.log(vmInstructions);
