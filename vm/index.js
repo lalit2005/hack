@@ -11,7 +11,7 @@ if (!argv[1]) {
 
 const filePath = argv[2];
 const fileContents = fs.readFileSync(filePath);
-const vmInstructions = fileContents
+let vmInstructions = fileContents
   .toString()
   .split("\n")
   .map((a) => {
@@ -67,7 +67,20 @@ function translate(vmInstructions) {
       console.log(instruction);
       finalAsmCode.push(instruction);
     } else if (inx.startsWith("function")) {
+      instruction = parseFunction(inx);
+      console.log(instruction);
+      finalAsmCode.push(instruction);
     } else if (inx.startsWith("call")) {
+      instruction = parseCall(inx);
+      console.log(instruction);
+      finalAsmCode.push(instruction);
+    } else if (inx.startsWith("return")) {
+      instruction = parseReturn(inx);
+      console.log(instruction);
+      finalAsmCode.push(instruction);
+    } else {
+      console.error(inx);
+      throw new Error("Unrecognized vm instruction");
     }
   });
 
@@ -77,13 +90,147 @@ function translate(vmInstructions) {
   );
 }
 
+function parseReturn(inx) {
+  return `// ${inx}
+@LCL
+D=M
+@R13 // FRAME variable
+M=D
+
+@5
+D=D-A
+@R14 // RETURN address
+M=D
+
+@SP
+M=M-1
+A=M
+D=M
+@ARG
+A=M
+M=D
+
+@ARG
+D=M
+@SP
+M=D+1
+
+@R13
+D=M
+@1
+D=D-A
+A=D
+D=M
+@THAT
+M=D
+
+@R13
+D=M
+@2
+D=D-A
+A=D
+D=M
+@THIS
+M=D
+
+@R13
+D=M
+@3
+D=D-A
+A=D
+D=M
+@ARG
+M=D
+
+@R13
+D=M
+@4
+D=D-A
+A=D
+D=M
+@LCL
+M=D
+
+@R13
+A=M
+0;JMP
+`.trim();
+}
+
+function parseCall(inx) {
+  if (inx.split(" ").length != 3) {
+    throw new Error("Invalid call instruction" + " " + inx);
+  }
+  let [_, fnName, n] = inx.split(" ");
+  let asmCode = `// ${inx}
+@${fnName + ".return"}
+D=A
+@SP
+A=M
+M=D
+
+@LCL
+D=M
+@SP
+AM=M+1
+M=D
+
+@ARG
+D=M
+@SP
+AM=M+1
+M=D
+
+@THIS
+D=M
+@SP
+AM=M+1
+M=D
+
+@THAT
+D=M
+@SP
+AM=M+1
+M=D
+
+@SP
+D=M
+@${n}
+D=D-M
+@5
+D=D-M
+@ARG
+M=D
+
+@SP
+D=M
+@LCL
+M=D
+
+(${fnName + ".return"})
+`;
+  return asmCode.trim();
+}
+
+function parseFunction(inx) {
+  if (inx.split(" ").length != 3) {
+    throw new Error("Invalid function statement" + " " + inx);
+  }
+  let [_, fnName, n] = inx.split(" ");
+  let asmCode = `// ${inx}
+(${fnName})\n`;
+  for (let i = 0; i < n; i++) {
+    asmCode += `${parsePush("push constant 0")}\n`;
+  }
+  return asmCode.trim();
+}
+
 function parseIfGoto(inx) {
   if (inx.split(" ").length != 2) {
     throw new Error("Invalid if-goto statement" + " " + inx);
   }
   let [_, labelName] = inx.split(" ");
-  let asmCode = `
-// ${inx}
+  let asmCode = `// ${inx}
 @SP
 M=M-1
 A=M
@@ -303,7 +450,6 @@ M=M+1
       asmCode = "---------INVALID PUSH -----------";
       break;
   }
-  console.log(asmCode);
   return `// ${inx}
 ${asmCode.trim()}
 `.trim();
@@ -476,4 +622,3 @@ function randomInt() {
 }
 
 translate(vmInstructions);
-console.log(vmInstructions);
