@@ -94,66 +94,54 @@ function parseReturn(inx) {
   return `// ${inx}
 @LCL
 D=M
-@R13 // FRAME variable
+@R13 // FRAME = LCL
 M=D
 
 @5
-D=D-A
-@R14 // RETURN address
+A=D-A
+D=M
+@R14 // RET = *(FRAME-5)
 M=D
 
 @SP
-M=M-1
-A=M
+AM=M-1
 D=M
 @ARG
 A=M
-M=D
+M=D   // *ARG = pop()
 
 @ARG
-D=M
+D=M+1
 @SP
-M=D+1
+M=D   // SP = ARG+1
 
 @R13
-D=M
-@1
-D=D-A
-A=D
+AM=M-1
 D=M
 @THAT
-M=D
+M=D   // THAT = *(FRAME-1)
 
 @R13
-D=M
-@2
-D=D-A
-A=D
+AM=M-1
 D=M
 @THIS
-M=D
+M=D   // THIS = *(FRAME-2)
 
 @R13
-D=M
-@3
-D=D-A
-A=D
+AM=M-1
 D=M
 @ARG
-M=D
+M=D   // ARG = *(FRAME-3)
 
 @R13
-D=M
-@4
-D=D-A
-A=D
+AM=M-1
 D=M
 @LCL
-M=D
+M=D   // LCL = *(FRAME-4)
 
-@R13
+@R14
 A=M
-0;JMP
+0;JMP // goto RET
 `.trim();
 }
 
@@ -162,54 +150,64 @@ function parseCall(inx) {
     throw new Error("Invalid call instruction" + " " + inx);
   }
   let [_, fnName, n] = inx.split(" ");
-  let asmCode = `// ${inx}
-@${fnName + ".return"}
+  return `// ${inx}
+@${fnName}.return
 D=A
 @SP
 A=M
 M=D
+@SP
+M=M+1 // push return-address
 
 @LCL
 D=M
 @SP
-AM=M+1
+A=M
 M=D
+@SP
+M=M+1 // push LCL
 
 @ARG
 D=M
 @SP
-AM=M+1
+A=M
 M=D
+@SP
+M=M+1 // push ARG
 
 @THIS
 D=M
 @SP
-AM=M+1
+A=M
 M=D
+@SP
+M=M+1 // push THIS
 
 @THAT
 D=M
 @SP
-AM=M+1
+A=M
 M=D
+@SP
+M=M+1 // push THAT
 
 @SP
 D=M
-@${n}
-D=D-M
-@5
-D=D-M
+@${parseInt(n) + 5}
+D=D-A
 @ARG
-M=D
+M=D   // ARG = SP-n-5
 
 @SP
 D=M
 @LCL
-M=D
+M=D   // LCL = SP
 
-(${fnName + ".return"})
-`;
-  return asmCode.trim();
+@${fnName}
+0;JMP // goto f
+
+(${fnName}.return)
+`.trim();
 }
 
 function parseFunction(inx) {
@@ -218,27 +216,20 @@ function parseFunction(inx) {
   }
   let [_, fnName, n] = inx.split(" ");
   let asmCode = `// ${inx}
-(${fnName})\n`;
-  for (let i = 0; i < n; i++) {
-    asmCode += `${parsePush("push constant 0")}\n`;
-  }
-  return asmCode.trim();
-}
-
-function parseIfGoto(inx) {
-  if (inx.split(" ").length != 2) {
-    throw new Error("Invalid if-goto statement" + " " + inx);
-  }
-  let [_, labelName] = inx.split(" ");
-  let asmCode = `// ${inx}
+(${fnName})
 @SP
-M=M-1
 A=M
-D=M
-@${labelName}
-D;JGT
 `;
-  return asmCode;
+  for (let i = 0; i < parseInt(n); i++) {
+    asmCode += `M=0
+A=A+1
+`;
+  }
+  asmCode += `D=A
+@SP
+M=D // SP = SP + ${n}
+`;
+  return asmCode.trim();
 }
 
 function parseGoto(inx) {
