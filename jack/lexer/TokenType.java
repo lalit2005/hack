@@ -39,7 +39,7 @@ public enum TokenType {
     OR,
     LT,
     GT,
-    EQUAL,
+    EQUALS,
     TILDE,
     IDENTIFIER,
     STRING_CONSTANT,

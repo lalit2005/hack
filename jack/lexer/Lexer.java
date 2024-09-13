@@ -4,15 +4,41 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PushbackReader;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class Lexer {
   private PushbackReader reader;
   private ArrayList<Token> tokensList;
   private char currentChar;
+  private HashMap<String, TokenType> keywordMap;
 
   public Lexer(FileReader fileStream) {
     this.reader = new PushbackReader(fileStream);
     this.tokensList = new ArrayList<>();
+    this.keywordMap = new HashMap<>();
+    initializeKeywordMap();
+  }
+
+  private void initializeKeywordMap() {
+    keywordMap.put("class", TokenType.CLASS);
+    keywordMap.put("constructor", TokenType.CONSTRUCTOR);
+    keywordMap.put("function", TokenType.FUNCTION);
+    keywordMap.put("static", TokenType.STATIC);
+    keywordMap.put("var", TokenType.VAR);
+    keywordMap.put("int", TokenType.INT);
+    keywordMap.put("char", TokenType.CHAR);
+    keywordMap.put("boolean", TokenType.BOOLEAN);
+    keywordMap.put("void", TokenType.VOID);
+    keywordMap.put("true", TokenType.TRUE);
+    keywordMap.put("false", TokenType.FALSE);
+    keywordMap.put("null", TokenType.NULL);
+    keywordMap.put("this", TokenType.THIS);
+    keywordMap.put("let", TokenType.LET);
+    keywordMap.put("do", TokenType.DO);
+    keywordMap.put("if", TokenType.IF);
+    keywordMap.put("else", TokenType.ELSE);
+    keywordMap.put("while", TokenType.WHILE);
+    keywordMap.put("return", TokenType.RETURN);
   }
 
   private char readChar() {
@@ -113,7 +139,7 @@ public class Lexer {
           addToken(currentChar, TokenType.GT);
           break;
         case '=':
-          addToken(currentChar, TokenType.ELSE);
+          addToken(currentChar, TokenType.EQUALS);
           break;
         case '~':
           addToken(currentChar, TokenType.TILDE);
@@ -135,7 +161,11 @@ public class Lexer {
               s += currentChar;
               readChar();
             }
-            addToken(s, TokenType.STRING_CONSTANT);
+            if (keywordMap.containsKey(s)) {
+              addToken(s, keywordMap.get(s));
+            } else {
+              addToken(s, TokenType.IDENTIFIER);
+            }
           }
           break;
       }
