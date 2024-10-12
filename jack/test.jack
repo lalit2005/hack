@@ -1,7 +1,23 @@
 class Main {
     method void main() {
-        var Human human;
-        let human = Human.new("Will", 10);
-        Output.printInt(human.get_heart_count());
+            var Human human;
+            let human = Human.new("Will", 10);
+            Output.printInt(human.get_heart_count());
+            return this;
+    }
+}
+
+class Human {
+    field string name;
+    field int age;
+    static int heart_count;
+    constructor Human new(human_instance_name, human_instance_age) {
+        let name = human_instance_name;
+        let age = human_instance_age;
+        let static = 1;
+        return this;
+    }
+    method int get_heart_count() {
+        return heart_count;
     }
 }

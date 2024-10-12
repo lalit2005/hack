@@ -41,7 +41,8 @@ public enum TokenType {
     GT,
     EQUALS,
     TILDE,
-    IDENTIFIER,
+    INTEGER_CONSTANT,
     STRING_CONSTANT,
-    INTEGER_CONSTANT
+    IDENTIFIER,
+    EOF
 }

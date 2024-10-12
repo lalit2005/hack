@@ -11,11 +11,18 @@ public class Lexer {
   private ArrayList<Token> tokensList;
   private char currentChar;
   private HashMap<String, TokenType> keywordMap;
+  private int currentIndex;
+  private Token curToken;
+
+  public Token getCurToken() {
+    return curToken;
+  }
 
   public Lexer(FileReader fileStream) {
     this.reader = new PushbackReader(fileStream);
     this.tokensList = new ArrayList<>();
     this.keywordMap = new HashMap<>();
+    this.currentIndex = -1; // -1 so that from the first nextToken call, this can be incremented
     initializeKeywordMap();
   }
 
@@ -74,6 +81,14 @@ public class Lexer {
   private void addToken(String value, TokenType tokenType) {
     Token t = new Token(value, tokenType);
     tokensList.add(t);
+  }
+
+  public void nextToken() {
+    this.curToken = tokensList.get(++currentIndex);
+  }
+
+  public Token peekToken() {
+    return this.tokensList.get(currentIndex + 1);
   }
 
   public void tokenize() {
@@ -171,8 +186,6 @@ public class Lexer {
       }
       readChar();
     }
-    for (Token token : tokensList) {
-      System.out.println(token.getValue() + " : " + token.getType());
-    }
+    addToken("", TokenType.EOF);
   }
 }

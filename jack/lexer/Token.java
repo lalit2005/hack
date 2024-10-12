@@ -25,4 +25,8 @@ public class Token {
         this.type = type;
     }
 
+    @Override
+    public String toString() {
+        return String.format("%-15s : %-20s", this.type, this.value);
+    }
 }
